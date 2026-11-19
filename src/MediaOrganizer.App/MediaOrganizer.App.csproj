@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>12</LangVersion>
+    <AssemblyName>MediaOrganizer</AssemblyName>
+    <RootNamespace>MediaOrganizer.App</RootNamespace>
+    <ApplicationTitle>Professional Media Organizer</ApplicationTitle>
+    <Version>1.0.0</Version>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MediaOrganizer.Core\MediaOrganizer.Core.csproj" />
+  </ItemGroup>
+
+</Project>

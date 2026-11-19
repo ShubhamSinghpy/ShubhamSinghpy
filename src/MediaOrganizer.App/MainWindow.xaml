@@ -1,0 +1,327 @@
+<Window x:Class="MediaOrganizer.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Professional Media Organizer"
+        Width="1240" Height="820" MinWidth="1020" MinHeight="660"
+        Background="#F4F6FA" FontFamily="Segoe UI" FontSize="13"
+        WindowStartupLocation="CenterScreen">
+
+    <Window.Resources>
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#E3E7EF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="14"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="Background" Value="#2F6FED"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="#AEB9CF"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SecondaryButton" TargetType="Button">
+            <Setter Property="Padding" Value="14,8"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <Style TargetType="CheckBox">
+            <Setter Property="Margin" Value="0,0,20,6"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="FilterLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#667085"/>
+            <Setter Property="Margin" Value="0,0,0,2"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ================= Folders ================= -->
+        <Border Grid.Row="0" Style="{StaticResource Card}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.ColumnSpan="3" Text="Professional Photo, Video &amp; Screenshot Organizer"
+                           FontSize="20" FontWeight="SemiBold" Foreground="#1B2A49" Margin="0,0,0,2"/>
+                <TextBlock Grid.Row="1" Grid.ColumnSpan="3" Foreground="#667085" Margin="0,0,0,10"
+                           Text="Copies your media into a clean folder structure. Your original files are never moved, changed, compressed or deleted."/>
+
+                <StackPanel Grid.Row="2" Grid.ColumnSpan="3">
+                    <Grid Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="130"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Source folder" VerticalAlignment="Center"/>
+                        <TextBox Grid.Column="1" Padding="6,5" IsEnabled="{Binding CanEdit}"
+                                 Text="{Binding SourceFolder, UpdateSourceTrigger=PropertyChanged}"/>
+                        <Button Grid.Column="2" Content="Browse..." Margin="8,0,0,0" Padding="14,5"
+                                Command="{Binding BrowseSourceCommand}"/>
+                    </Grid>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="130"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Destination folder" VerticalAlignment="Center"/>
+                        <TextBox Grid.Column="1" Padding="6,5" IsEnabled="{Binding CanEdit}"
+                                 Text="{Binding DestinationFolder, UpdateSourceTrigger=PropertyChanged}"/>
+                        <Button Grid.Column="2" Content="Browse..." Margin="8,0,0,0" Padding="14,5"
+                                Command="{Binding BrowseDestinationCommand}"/>
+                    </Grid>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ================= Options + actions ================= -->
+        <Border Grid.Row="1" Style="{StaticResource Card}">
+            <StackPanel>
+                <TextBlock Text="Folder structure and options" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                <WrapPanel IsEnabled="{Binding CanEdit}">
+                    <CheckBox Content="Year folders" IsChecked="{Binding UseYear}"/>
+                    <CheckBox Content="Month folders (YYYY-MM)" IsChecked="{Binding UseMonth}"/>
+                    <CheckBox Content="Location folders (photos &amp; videos)" IsChecked="{Binding UseLocation}"/>
+                    <CheckBox Content="Group into events" IsChecked="{Binding GroupEvents}"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,20,6" ToolTip="A new event starts when two files are further apart in time than this.">
+                        <TextBlock Text="Event gap (hours):" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBox Width="50" Padding="4,2" Text="{Binding EventGapHours, UpdateSourceTrigger=LostFocus, StringFormat=0.##}"/>
+                    </StackPanel>
+                    <CheckBox Content="Copy non-media files to Unclassified" IsChecked="{Binding IncludeNonMedia}"/>
+                    <CheckBox Content="Also write Excel report" IsChecked="{Binding ExportExcel}"/>
+                </WrapPanel>
+
+                <Border Background="#EEF4FF" BorderBrush="#C9DAFB" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,2,0,10"
+                        IsEnabled="{Binding CanEdit}">
+                    <StackPanel>
+                        <CheckBox IsChecked="{Binding OnlineGeocoding}" Margin="0,0,0,2"
+                                  Content="Fetch place names online (city / locality from GPS)" FontWeight="SemiBold"/>
+                        <TextBlock TextWrapping="Wrap" Foreground="#475467" FontSize="12">
+                            <Run Text="When on, only rounded GPS coordinates (about 1 km precision) are sent to OpenStreetMap to get names like &quot;Lucknow&quot;. "/>
+                            <Run Text="Your photos, videos and file names are never uploaded. Results are cached on this PC. "/>
+                            <Run Text="When off or offline, folders are named from coordinates (for example GPS_26.8N_80.9E)."/>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+
+                <WrapPanel>
+                    <Button Content="1. Analyze &amp; Preview" Style="{StaticResource PrimaryButton}" Command="{Binding AnalyzeCommand}"/>
+                    <Button Content="2. Start / Resume" Style="{StaticResource PrimaryButton}" Command="{Binding StartCommand}"/>
+                    <Button Content="{Binding PauseText}" Style="{StaticResource SecondaryButton}" Command="{Binding PauseCommand}"/>
+                    <Button Content="Cancel" Style="{StaticResource SecondaryButton}" Command="{Binding CancelCommand}"/>
+                    <Button Content="Retry failed" Style="{StaticResource SecondaryButton}" Command="{Binding RetryCommand}"/>
+                    <Button Content="Open organized folder" Style="{StaticResource SecondaryButton}" Command="{Binding OpenOutputCommand}"/>
+                    <Button Content="Open reports" Style="{StaticResource SecondaryButton}" Command="{Binding OpenReportsCommand}"/>
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- ================= Warning banner ================= -->
+        <Border Grid.Row="2" Background="#FFF6E0" BorderBrush="#F2D48A" BorderThickness="1" CornerRadius="6"
+                Padding="10,7" Margin="0,0,0,10">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding HasWarning}" Value="True">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <TextBlock Text="{Binding WarningText}" TextWrapping="Wrap" Foreground="#7A4B00"/>
+        </Border>
+
+        <!-- ================= Tabs ================= -->
+        <TabControl Grid.Row="3" Background="White">
+            <TabItem Header="Dashboard">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12">
+                    <StackPanel>
+                        <ItemsControl ItemsSource="{Binding Cards}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource Card}" Width="172" Margin="0,0,10,10" Background="#F8FAFD">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Title}" Foreground="#667085" FontSize="12" TextWrapping="Wrap"/>
+                                            <TextBlock Text="{Binding Value}" FontSize="22" FontWeight="SemiBold" Foreground="#1B2A49"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <Grid Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel>
+                                <TextBlock Text="Media by year" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                <ItemsControl ItemsSource="{Binding YearBars}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,3">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="150"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="70"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding Label, Mode=OneWay}" TextTrimming="CharacterEllipsis"/>
+                                                <ProgressBar Grid.Column="1" Height="12" Maximum="100" Margin="8,0" Value="{Binding Percent, Mode=OneWay}"/>
+                                                <TextBlock Grid.Column="2" Text="{Binding Count, Mode=OneWay}" HorizontalAlignment="Right"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Top locations (photos &amp; videos)" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                <ItemsControl ItemsSource="{Binding LocationBars}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,3">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="170"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="70"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding Label, Mode=OneWay}" TextTrimming="CharacterEllipsis"/>
+                                                <ProgressBar Grid.Column="1" Height="12" Maximum="100" Margin="8,0" Value="{Binding Percent, Mode=OneWay}"/>
+                                                <TextBlock Grid.Column="2" Text="{Binding Count, Mode=OneWay}" HorizontalAlignment="Right"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="Preview &amp; Files">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <WrapPanel Margin="0,0,0,8">
+                        <StackPanel Margin="0,0,10,6">
+                            <TextBlock Text="Search" Style="{StaticResource FilterLabel}"/>
+                            <TextBox Width="190" Padding="4,3" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,10,6">
+                            <TextBlock Text="Year" Style="{StaticResource FilterLabel}"/>
+                            <ComboBox Width="80" ItemsSource="{Binding YearOptions}" SelectedItem="{Binding SelectedYear}"/>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,10,6">
+                            <TextBlock Text="Month" Style="{StaticResource FilterLabel}"/>
+                            <ComboBox Width="70" ItemsSource="{Binding MonthOptions}" SelectedItem="{Binding SelectedMonth}"/>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,10,6">
+                            <TextBlock Text="Location" Style="{StaticResource FilterLabel}"/>
+                            <ComboBox Width="150" ItemsSource="{Binding LocationOptions}" SelectedItem="{Binding SelectedLocation}"/>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,10,6">
+                            <TextBlock Text="Category" Style="{StaticResource FilterLabel}"/>
+                            <ComboBox Width="110" ItemsSource="{Binding CategoryOptions}" SelectedItem="{Binding SelectedCategory}"/>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,10,6">
+                            <TextBlock Text="Device / camera" Style="{StaticResource FilterLabel}"/>
+                            <ComboBox Width="160" ItemsSource="{Binding DeviceOptions}" SelectedItem="{Binding SelectedDevice}"/>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,10,6">
+                            <TextBlock Text="Format" Style="{StaticResource FilterLabel}"/>
+                            <ComboBox Width="80" ItemsSource="{Binding FormatOptions}" SelectedItem="{Binding SelectedFormat}"/>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,10,6">
+                            <TextBlock Text="Duplicates" Style="{StaticResource FilterLabel}"/>
+                            <ComboBox Width="130" ItemsSource="{Binding DuplicateOptions}" SelectedItem="{Binding SelectedDuplicate}"/>
+                        </StackPanel>
+                    </WrapPanel>
+
+                    <DataGrid Grid.Row="1" ItemsSource="{Binding FilesView}" AutoGenerateColumns="False"
+                              IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False"
+                              GridLinesVisibility="Horizontal" HeadersVisibility="Column"
+                              EnableRowVirtualization="True" SelectionMode="Extended">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="File" Binding="{Binding FileName, Mode=OneWay}" Width="190"/>
+                            <DataGridTextColumn Header="Category" Binding="{Binding Category, Mode=OneWay}" Width="85"/>
+                            <DataGridTextColumn Header="Capture date" Binding="{Binding CaptureDateText, Mode=OneWay}" Width="130"/>
+                            <DataGridTextColumn Header="Date source" Binding="{Binding DateSourceText, Mode=OneWay}" Width="150"/>
+                            <DataGridTextColumn Header="Location" Binding="{Binding Location, Mode=OneWay}" Width="130"/>
+                            <DataGridTextColumn Header="Device" Binding="{Binding Device, Mode=OneWay}" Width="130"/>
+                            <DataGridTextColumn Header="Resolution" Binding="{Binding Resolution, Mode=OneWay}" Width="90"/>
+                            <DataGridTextColumn Header="Size" Binding="{Binding SizeText, Mode=OneWay}" Width="75"/>
+                            <DataGridTextColumn Header="Duplicate" Binding="{Binding DuplicateText, Mode=OneWay}" Width="130"/>
+                            <DataGridTextColumn Header="Status" Binding="{Binding StatusText, Mode=OneWay}" Width="120"/>
+                            <DataGridTextColumn Header="Proposed destination" Binding="{Binding DestinationPath, Mode=OneWay}" Width="*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <TextBlock Grid.Row="2" Margin="0,6,0,0" Foreground="#667085" Text="{Binding FilesCountText}"/>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Issues">
+                <ListBox Margin="10" ItemsSource="{Binding Issues}" BorderThickness="0"/>
+            </TabItem>
+        </TabControl>
+
+        <!-- ================= Progress ================= -->
+        <Border Grid.Row="4" Style="{StaticResource Card}" Margin="0,10,0,0">
+            <StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding StatusText}" TextTrimming="CharacterEllipsis" ToolTip="{Binding StatusText}"/>
+                    <TextBlock Grid.Column="1" Text="{Binding ProgressText}" Foreground="#667085" Margin="12,0,0,0"/>
+                </Grid>
+                <ProgressBar Height="10" Margin="0,8,0,0" Maximum="100"
+                             Value="{Binding ProgressValue, Mode=OneWay}"
+                             IsIndeterminate="{Binding IsIndeterminate}"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

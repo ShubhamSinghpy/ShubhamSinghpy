@@ -1,0 +1,37 @@
+name: Build Windows app
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Get ffprobe
+        shell: pwsh
+        run: ./tools/get-tools.ps1
+
+      - name: Test
+        run: dotnet test tests/MediaOrganizer.Tests/MediaOrganizer.Tests.csproj -c Release
+
+      - name: Publish standalone exe
+        shell: pwsh
+        run: |
+          dotnet publish src/MediaOrganizer.App/MediaOrganizer.App.csproj -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true `
+            -o dist/MediaOrganizer
+          New-Item -ItemType Directory -Force dist/MediaOrganizer/tools | Out-Null
+          Copy-Item tools/ffprobe.exe dist/MediaOrganizer/tools/ffprobe.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MediaOrganizer-win-x64
+          path: dist/MediaOrganizer
