@@ -2,6 +2,15 @@ using MediaOrganizer.Core;
 
 namespace MediaOrganizer.Tests;
 
+internal static class TestIsolation
+{
+    /// <summary>Tests must never read or write the real %LocalAppData%\MediaOrganizer cache or settings.</summary>
+    [System.Runtime.CompilerServices.ModuleInitializer]
+    internal static void Init() =>
+        Environment.SetEnvironmentVariable("MEDIAORGANIZER_DATA",
+            System.IO.Path.Combine(System.IO.Path.GetTempPath(), "MediaOrganizerTests_AppData_" + Environment.ProcessId));
+}
+
 public sealed class TempDir : IDisposable
 {
     public string Path { get; }

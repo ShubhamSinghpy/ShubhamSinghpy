@@ -37,8 +37,11 @@ public sealed class OrganizerSettings
     public int EffectiveThreads => Threads > 0 ? Threads : Math.Clamp(Environment.ProcessorCount, 2, 8);
 
     // ---- persistence ------------------------------------------------------
-    public static string AppDataFolder => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MediaOrganizer");
+    /// <summary>%LocalAppData%\MediaOrganizer, or the folder in MEDIAORGANIZER_DATA (used by tests to stay isolated).</summary>
+    public static string AppDataFolder =>
+        Environment.GetEnvironmentVariable("MEDIAORGANIZER_DATA") is { Length: > 0 } custom
+            ? custom
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MediaOrganizer");
 
     public static string SettingsPath => Path.Combine(AppDataFolder, "settings.json");
 

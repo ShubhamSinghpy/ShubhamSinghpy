@@ -295,6 +295,33 @@ public class LocationResolverTests
         Assert.Equal("GPS_26.8N_80.9E", it.Location);
     }
 
+    [Theory]
+    [InlineData("Shimla ( Rural )", "Shimla")]
+    [InlineData("Shimla", "Shimla")]
+    [InlineData("Sudhagad Taluka", "Sudhagad")]
+    [InlineData("Lakhimpur", "Lakhimpur")]
+    [InlineData("Kosya Kutauli Tehsil", "Kosya Kutauli")]
+    [InlineData("Rural", "Rural")]
+    [InlineData("Uttar Pradesh", "Uttar Pradesh")]
+    public void Normalizes_place_names(string input, string expected) =>
+        Assert.Equal(expected, PlaceNames.Normalize(input));
+
+    [Fact]
+    public async Task Nearby_cells_with_variant_names_share_one_folder()
+    {
+        var names = new Queue<string>(new[] { "Shimla", "Shimla ( Rural )" });
+        var handler = new FakeHandler(() => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("{\"address\":{\"city\":\"" + names.Dequeue() + "\"}}")
+        });
+        var a = Gps(31.10, 77.17);
+        var b = Gps(31.20, 77.30);
+        using var client = new NominatimClient(handler);
+        await new LocationResolver(null, true, client).ResolveAsync(new[] { a, b }, null, CancellationToken.None);
+        Assert.Equal("Shimla", a.Location);
+        Assert.Equal("Shimla", b.Location);
+    }
+
     [Fact]
     public void Parses_nominatim_address_preferring_city()
     {

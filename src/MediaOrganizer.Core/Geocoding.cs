@@ -94,6 +94,34 @@ public sealed class NominatimClient : IDisposable
     }
 }
 
+/// <summary>
+/// Makes place names from the geocoder consistent, so nearby photos and videos land in one folder:
+/// "Shimla ( Rural )" and "Shimla" both become "Shimla"; "Sudhagad Taluka" becomes "Sudhagad".
+/// </summary>
+public static class PlaceNames
+{
+    private static readonly System.Text.RegularExpressions.Regex Brackets =
+        new(@"\s*[\(\[][^\)\]]*[\)\]]\s*", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static readonly System.Text.RegularExpressions.Regex Suffix =
+        new(@"\s+(rural|urban|taluka|taluk|tehsil|tahsil|tahasil|block|mandal|district|municipality|municipal corporation|nagar palika|nagar panchayat)$",
+            System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    public static string Normalize(string name)
+    {
+        var s = Brackets.Replace(name, " ");
+        s = string.Join(' ', s.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        // Strip generic admin words, but never reduce a name to nothing.
+        for (int i = 0; i < 2; i++)
+        {
+            var t = Suffix.Replace(s, "").Trim();
+            if (t.Length == 0) break;
+            s = t;
+        }
+        return s.Length == 0 ? name.Trim() : s;
+    }
+}
+
 /// <summary>Assigns a folder-safe location name to every item that has GPS coordinates.</summary>
 public sealed class LocationResolver
 {
@@ -101,6 +129,7 @@ public sealed class LocationResolver
     private readonly bool _online;
     private readonly NominatimClient? _client;
     private int _consecutiveFailures;
+    private readonly Dictionary<string, string> _canonical = new(StringComparer.OrdinalIgnoreCase);
 
     public LocationResolver(AppCache? cache, bool online, NominatimClient? client = null)
     {
@@ -147,8 +176,11 @@ public sealed class LocationResolver
                 }
             }
 
-            name ??= OfflineLocationNamer.Name(first.Latitude!.Value, first.Longitude!.Value);
-            var folder = PathPlanner.SanitizeSegment(name);
+            name = name != null
+                ? PlaceNames.Normalize(name)
+                : OfflineLocationNamer.Name(first.Latitude!.Value, first.Longitude!.Value);
+            // Same place spelled differently (case) across cells always shares one folder name.
+            var folder = PathPlanner.SanitizeSegment(_canonical.TryGetValue(name, out var c) ? c : (_canonical[name] = name));
             foreach (var it in g) it.Location = folder;
 
             done++;
