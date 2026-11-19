@@ -29,6 +29,14 @@ if (-not $SkipTools -and -not (Test-Path "$root\tools\ffprobe.exe")) {
             Write-Host "The app still works; videos will just have limited metadata (see docs\USER_GUIDE.md)." -ForegroundColor Yellow }
 }
 
+# 2b. Face models for the OPTIONAL face recognition feature (about 40 MB, one time)
+if (-not $SkipTools -and -not ((Test-Path "$root\models\face_detection_yunet_2023mar.onnx") -and (Test-Path "$root\models\face_recognition_sface_2021dec.onnx"))) {
+    Write-Host "Downloading face models (one time)..."
+    try { & "$root\tools\get-models.ps1" }
+    catch { Write-Host "Could not download the face models: $($_.Exception.Message)" -ForegroundColor Yellow
+            Write-Host "The app still works; the optional face recognition feature will ask for them (run tools\get-models.ps1)." -ForegroundColor Yellow }
+}
+
 # 3. Tests
 if (-not $SkipTests) {
     Write-Host "Running tests..." -ForegroundColor Cyan
@@ -46,10 +54,17 @@ dotnet publish "$root\src\MediaOrganizer.App\MediaOrganizer.App.csproj" `
     -o $out
 if ($LASTEXITCODE -ne 0) { throw "Publish failed." }
 
-# 5. Put ffprobe next to the exe
-if (Test-Path "$root\tools\ffprobe.exe") {
-    New-Item -ItemType Directory -Force "$out\tools" | Out-Null
-    Copy-Item "$root\tools\ffprobe.exe" "$out\tools\ffprobe.exe" -Force
+# Native-package leftovers that are not needed to run (import libraries, debug symbols).
+Get-ChildItem $out -File | Where-Object { $_.Extension -in ".lib", ".pdb" } | Remove-Item -Force
+
+# 5. Put ffprobe (and ffmpeg, for optional face recognition in videos) next to the exe
+New-Item -ItemType Directory -Force "$out\tools" | Out-Null
+foreach ($t in "ffprobe.exe", "ffmpeg.exe") {
+    if (Test-Path "$root\tools\$t") { Copy-Item "$root\tools\$t" "$out\tools\$t" -Force }
+}
+# Face models are copied beside the exe by the project file ("models" folder).
+if (-not (Test-Path "$out\models\face_recognition_sface_2021dec.onnx")) {
+    Write-Host "Note: face models are missing from the output; run tools\get-models.ps1 and build again to include them." -ForegroundColor Yellow
 }
 
 Write-Host ""

@@ -293,6 +293,7 @@
                             <DataGridTextColumn Header="Resolution" Binding="{Binding Resolution, Mode=OneWay}" Width="90"/>
                             <DataGridTextColumn Header="Size" Binding="{Binding SizeText, Mode=OneWay}" Width="75"/>
                             <DataGridTextColumn Header="Duplicate" Binding="{Binding DuplicateText, Mode=OneWay}" Width="130"/>
+                            <DataGridTextColumn Header="People" Binding="{Binding PeopleText, Mode=OneWay}" Width="110"/>
                             <DataGridTextColumn Header="Status" Binding="{Binding StatusText, Mode=OneWay}" Width="120"/>
                             <DataGridTextColumn Header="Proposed destination" Binding="{Binding DestinationPath, Mode=OneWay}" Width="*"/>
                         </DataGrid.Columns>
@@ -300,6 +301,211 @@
 
                     <TextBlock Grid.Row="2" Margin="0,6,0,0" Foreground="#667085" Text="{Binding FilesCountText}"/>
                 </Grid>
+            </TabItem>
+
+            <TabItem Header="People (optional)">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12">
+                    <StackPanel>
+
+                        <!-- ===== on / off ===== -->
+                        <Border Background="#EEF4FF" BorderBrush="#C9DAFB" BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="0,0,0,10">
+                            <StackPanel>
+                                <CheckBox IsChecked="{Binding FaceEnabled}" IsEnabled="{Binding CanEdit}" Margin="0,0,0,4"
+                                          Content="Enable face recognition (optional)" FontWeight="SemiBold" FontSize="14"/>
+                                <TextBlock TextWrapping="Wrap" Foreground="#475467" FontSize="12">
+                                    <Run Text="Off by default. While it is off, no face model is loaded and nothing is scanned, so normal organizing is unchanged. "/>
+                                    <Run Text="Everything runs on this PC: your photos and face data are never uploaded. Only face fingerprints (numbers, not pictures) are kept in %LocalAppData%\MediaOrganizer, and you can delete them at any time below."/>
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+
+                        <StackPanel IsEnabled="{Binding FaceEnabled}">
+
+                            <!-- ===== 1. people ===== -->
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <TextBlock Text="1. Registered people" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                    <ListBox ItemsSource="{Binding People}" SelectedItem="{Binding SelectedPerson}" MaxHeight="130" MinHeight="40">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Width="180"/>
+                                                    <TextBlock Text="{Binding Details}" Foreground="#667085"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                    <Button Content="Remove selected person" Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left"
+                                            Margin="0,6,0,10" Command="{Binding RemovePersonCommand}"/>
+
+                                    <TextBlock Text="Add a person" Foreground="#667085" FontSize="11" Margin="0,0,0,2"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="220"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Padding="6,5" Text="{Binding NewPersonName, UpdateSourceTrigger=PropertyChanged}"
+                                                 ToolTip="The person's name. It is also used as the folder name in People\"/>
+                                        <Button Grid.Column="1" Content="Choose 1-4 reference photos..." Margin="8,0,0,0" Padding="12,5"
+                                                Command="{Binding ChooseReferencesCommand}"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding ReferenceSummary}" Margin="10,0" VerticalAlignment="Center"
+                                                   Foreground="#667085" TextTrimming="CharacterEllipsis" ToolTip="{Binding ReferenceSummary}"/>
+                                        <Button Grid.Column="3" Content="Register person" Style="{StaticResource PrimaryButton}" Margin="0"
+                                                Command="{Binding RegisterPersonCommand}"/>
+                                    </Grid>
+                                    <TextBlock Margin="0,6,0,0" Foreground="#667085" FontSize="12" TextWrapping="Wrap"
+                                               Text="Use clear, well-lit, front-facing photos of only that person. More varied reference photos (different angle or lighting) give better matches."/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- ===== 2. scan ===== -->
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <TextBlock Text="2. Choose what to scan, then scan" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                    <RadioButton GroupName="faceScope" IsChecked="{Binding ScopeAll}" Content="Entire analyzed library" Margin="0,0,0,4"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                        <RadioButton GroupName="faceScope" IsChecked="{Binding ScopeFolder}" Content="A specific folder:" VerticalAlignment="Center"/>
+                                        <TextBox Width="380" Padding="4,3" Margin="8,0,0,0" Text="{Binding FaceScopeFolder, UpdateSourceTrigger=PropertyChanged}"/>
+                                        <Button Content="Browse..." Margin="8,0,0,0" Padding="12,3" Command="{Binding BrowseFaceFolderCommand}"/>
+                                    </StackPanel>
+                                    <RadioButton GroupName="faceScope" IsChecked="{Binding ScopeSelected}" Margin="0,0,0,8"
+                                                 Content="Only the files I select in the review list below"/>
+
+                                    <WrapPanel Margin="0,0,0,8">
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,20,4"
+                                                    ToolTip="How similar a face must be to count as the registered person (0.2 to 0.9). Higher = stricter, fewer wrong names but more missed matches.">
+                                            <TextBlock Text="Match strictness:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                            <TextBox Width="50" Padding="4,2" Text="{Binding FaceMatchThreshold, UpdateSourceTrigger=LostFocus, StringFormat=0.00}"/>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,20,4"
+                                                    ToolTip="Pictures taken from each video (spread across its length). More frames find more people but take longer.">
+                                            <TextBlock Text="Frames per video:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                            <TextBox Width="40" Padding="4,2" Text="{Binding FaceVideoFrames, UpdateSourceTrigger=LostFocus}"/>
+                                        </StackPanel>
+                                        <CheckBox Content="Create People\Name folders (extra verified copies)" IsChecked="{Binding CreatePersonFolders}"/>
+                                        <CheckBox Content="Also collect unidentified people in People\_Unidentified_People" IsChecked="{Binding CollectUnidentified}"/>
+                                    </WrapPanel>
+
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button Content="Scan for faces" Style="{StaticResource PrimaryButton}" Command="{Binding ScanFacesCommand}"/>
+                                        <Button Content="Cancel" Style="{StaticResource SecondaryButton}" Command="{Binding CancelCommand}"/>
+                                        <TextBlock VerticalAlignment="Center" Foreground="#667085" FontSize="12"
+                                                   Text="Scanning only reads your files and copies nothing. Run Analyze &amp; Preview first."/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- ===== 3. results ===== -->
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <TextBlock Text="3. Results" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                    <ItemsControl ItemsSource="{Binding FaceCards}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Style="{StaticResource Card}" Width="172" Margin="0,0,10,10" Background="#F8FAFD">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding Title}" Foreground="#667085" FontSize="12" TextWrapping="Wrap"/>
+                                                        <TextBlock Text="{Binding Value}" FontSize="22" FontWeight="SemiBold" Foreground="#1B2A49"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Text="Files per registered person" Foreground="#667085" FontSize="11" Margin="0,4,0,2"/>
+                                    <ItemsControl ItemsSource="{Binding PersonBars}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,3">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="170"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="70"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="{Binding Label, Mode=OneWay}" TextTrimming="CharacterEllipsis"/>
+                                                    <ProgressBar Grid.Column="1" Height="12" Maximum="100" Margin="8,0" Value="{Binding Percent, Mode=OneWay}"/>
+                                                    <TextBlock Grid.Column="2" Text="{Binding Count, Mode=OneWay}" HorizontalAlignment="Right"/>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- ===== 4. review ===== -->
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <TextBlock Text="4. Review and correct" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                    <WrapPanel Margin="0,0,0,6">
+                                        <StackPanel Margin="0,0,10,4">
+                                            <TextBlock Text="Show" Style="{StaticResource FilterLabel}"/>
+                                            <ComboBox Width="190" ItemsSource="{Binding ReviewFilterOptions}" SelectedItem="{Binding SelectedReviewFilter}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,0,10,4">
+                                            <TextBlock Text="Person" Style="{StaticResource FilterLabel}"/>
+                                            <ComboBox Width="160" ItemsSource="{Binding ReviewPersonOptions}" SelectedItem="{Binding SelectedReviewPerson}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,0,10,4">
+                                            <TextBlock Text="File name" Style="{StaticResource FilterLabel}"/>
+                                            <TextBox Width="170" Padding="4,3" Text="{Binding ReviewSearch, UpdateSourceTrigger=PropertyChanged}"/>
+                                        </StackPanel>
+                                    </WrapPanel>
+
+                                    <Grid Height="290">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="12"/>
+                                            <ColumnDefinition Width="260"/>
+                                        </Grid.ColumnDefinitions>
+                                        <DataGrid x:Name="ReviewGrid" ItemsSource="{Binding ReviewView}" AutoGenerateColumns="False"
+                                                  IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False"
+                                                  GridLinesVisibility="Horizontal" HeadersVisibility="Column"
+                                                  EnableRowVirtualization="True" SelectionMode="Extended"
+                                                  SelectionChanged="ReviewGrid_SelectionChanged">
+                                            <DataGrid.Columns>
+                                                <DataGridTextColumn Header="File" Binding="{Binding FileName, Mode=OneWay}" Width="190"/>
+                                                <DataGridTextColumn Header="Type" Binding="{Binding Category, Mode=OneWay}" Width="80"/>
+                                                <DataGridTextColumn Header="Result" Binding="{Binding FaceCategoryText, Mode=OneWay}" Width="150"/>
+                                                <DataGridTextColumn Header="Faces" Binding="{Binding FaceCount, Mode=OneWay}" Width="50"/>
+                                                <DataGridTextColumn Header="Recognized people" Binding="{Binding PeopleText, Mode=OneWay}" Width="*"/>
+                                                <DataGridTextColumn Header="Unidentified" Binding="{Binding UnidentifiedFaces, Mode=OneWay}" Width="90"/>
+                                            </DataGrid.Columns>
+                                        </DataGrid>
+                                        <Border Grid.Column="2" BorderBrush="#E3E7EF" BorderThickness="1" CornerRadius="6" Padding="6">
+                                            <Grid>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="*"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
+                                                <Image Source="{Binding PreviewImage}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                                <TextBlock Grid.Row="1" Text="{Binding PreviewCaption}" TextWrapping="Wrap" Foreground="#667085" FontSize="11" Margin="0,4,0,0"/>
+                                            </Grid>
+                                        </Border>
+                                    </Grid>
+
+                                    <TextBlock Text="{Binding ReviewCountText}" Foreground="#667085" Margin="0,4,0,6"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="Person:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <ComboBox Width="170" ItemsSource="{Binding PersonNames}" SelectedItem="{Binding CorrectionPerson}" Margin="0,0,10,0"/>
+                                        <Button Content="Add to selected files" Style="{StaticResource SecondaryButton}" Command="{Binding AddPersonToSelectedCommand}"
+                                                ToolTip="Use when the app missed this person in the selected file(s)."/>
+                                        <Button Content="Remove from selected files" Style="{StaticResource SecondaryButton}" Command="{Binding RemovePersonFromSelectedCommand}"
+                                                ToolTip="Use when the app named the wrong person in the selected file(s)."/>
+                                    </StackPanel>
+                                    <TextBlock Margin="0,4,0,0" Foreground="#667085" FontSize="12" TextWrapping="Wrap"
+                                               Text="Corrections are remembered. After correcting, press Start / Resume to copy the changes into the People folder. Copies already made are kept - this app never deletes files."/>
+                                </StackPanel>
+                            </Border>
+
+                            <Button Content="Delete all face data from this PC..." Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left"
+                                    Command="{Binding DeleteFaceDataCommand}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
             </TabItem>
 
             <TabItem Header="Issues">

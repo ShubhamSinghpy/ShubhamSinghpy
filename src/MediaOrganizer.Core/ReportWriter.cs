@@ -58,10 +58,10 @@ public static class ReportWriter
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
     public static IReadOnlyList<string> Write(IReadOnlyList<MediaItem> items, RunSummary summary,
-                                              string folder, bool excel)
+                                              string folder, bool excel, IReadOnlyList<MediaItem>? personCopies = null)
     {
         Directory.CreateDirectory(folder);
-        var tables = BuildTables(items, summary);
+        var tables = BuildTables(items, summary, personCopies);
         var files = new List<string>();
 
         foreach (var t in tables)
@@ -87,7 +87,8 @@ public static class ReportWriter
         return files;
     }
 
-    public static List<ReportTable> BuildTables(IReadOnlyList<MediaItem> items, RunSummary summary)
+    public static List<ReportTable> BuildTables(IReadOnlyList<MediaItem> items, RunSummary summary,
+                                                IReadOnlyList<MediaItem>? personCopies = null)
     {
         var tables = new List<ReportTable>();
 
@@ -178,6 +179,40 @@ public static class ReportWriter
                      i.Status == ItemStatus.Verified && i.HashMatch == true ? "MATCH" :
                      i.Status == ItemStatus.Failed ? "FAILED: " + (i.Error ?? "") : "NOT VERIFIED"
                  }).ToList()));
+
+        // 7. People report (only when the optional face recognition feature was used).
+        if (items.Any(i => i.FaceScanned || i.FaceState != FaceScanState.NotScanned))
+        {
+            var copiesBySource = (personCopies ?? Array.Empty<MediaItem>())
+                .GroupBy(c => c.SourcePath, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+
+            tables.Add(new ReportTable("People_Report",
+                new[]
+                {
+                    "Original Filename", "Source Path", "Media Category", "Face Category", "Faces Detected",
+                    "Recognized People", "Unidentified Faces", "Manually Corrected", "Person Collection Copies", "Copy Status", "Notes"
+                },
+                items.Where(i => i.FaceState != FaceScanState.NotScanned || i.People.Count > 0)
+                     .OrderBy(i => i.SourcePath, StringComparer.OrdinalIgnoreCase)
+                     .Select(i =>
+                     {
+                         copiesBySource.TryGetValue(i.SourcePath, out var cp);
+                         cp ??= new List<MediaItem>();
+                         return new[]
+                         {
+                             i.FileName, i.SourcePath, i.Category.ToString(), i.FaceCategoryText, i.FaceCount.ToString(Inv),
+                             i.PeopleText, i.UnidentifiedFaces.ToString(Inv),
+                             i.AddedPeople.Count + i.RemovedPeople.Count > 0
+                                 ? "Yes (added: " + string.Join("; ", i.AddedPeople) + " / removed: " + string.Join("; ", i.RemovedPeople) + ")"
+                                 : "No",
+                             string.Join(" | ", cp.Select(c => c.DestinationPath)),
+                             cp.Count == 0 ? "" : cp.All(c => c.Status == ItemStatus.Verified) ? "Verified"
+                                 : cp.Any(c => c.Status == ItemStatus.Failed) ? "Failed" : "Not copied",
+                             i.FaceError ?? ""
+                         };
+                     }).ToList()));
+        }
 
         return tables;
     }

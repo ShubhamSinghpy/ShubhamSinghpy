@@ -19,6 +19,8 @@ public partial class App : Application
             AppLog.Error("Unobserved task exception.", args.Exception);
             args.SetObserved();
         };
+        // Only registers a decoder; nothing runs unless the user enables face recognition.
+        MediaOrganizer.Core.Faces.ImageLoader.PlatformDecoder = WicDecoder.Decode;
         AppLog.Info("Application started.");
     }
 

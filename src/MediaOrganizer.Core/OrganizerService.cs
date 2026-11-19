@@ -1,3 +1,5 @@
+using MediaOrganizer.Core.Faces;
+
 namespace MediaOrganizer.Core;
 
 public sealed class AnalysisResult
@@ -9,6 +11,9 @@ public sealed class AnalysisResult
     public bool OnlineLocationUnavailable { get; init; }
     public int OnlineLookups { get; init; }
     public DateTime StartedLocal { get; init; } = DateTime.Now;
+
+    /// <summary>Extra verified copies for the optional person-wise collections (empty unless face recognition was used).</summary>
+    public List<MediaItem> PersonCopies { get; set; } = new();
 }
 
 public sealed class RunResult
@@ -16,6 +21,8 @@ public sealed class RunResult
     public int Verified { get; set; }
     public int Failed { get; set; }
     public int Pending { get; set; }
+    public int PersonVerified { get; set; }
+    public int PersonFailed { get; set; }
     public bool Cancelled { get; set; }
     public string? Error { get; set; }
     public string? ReportFolder { get; set; }
@@ -83,6 +90,66 @@ public sealed class OrganizerService
     }
 
     /// <summary>
+    /// OPTIONAL face scan, run only when the user asks for it, on the files they chose. Never part of Analyze.
+    /// Everything stays on this PC; the originals are only read.
+    /// </summary>
+    public async Task<FaceScanSummary> ScanFacesAsync(AnalysisResult analysis, IReadOnlyList<MediaItem> targets,
+                                                      FaceOptions options, IProgress<ProgressInfo>? progress, CancellationToken ct,
+                                                      FaceEngine? engineOverride = null, PersonRegistry? registryOverride = null)
+    {
+        var engine = engineOverride ?? FaceEngine.TryCreate(out var error)
+            ?? throw new InvalidOperationException(error);
+        try
+        {
+            var registry = registryOverride ?? PersonRegistry.Load();
+            using var cache = AppCache.TryOpenDefault();
+            var scanner = new FaceScanner(engine, new FrameExtractor(), cache);
+
+            AppLog.Info($"Face scan started on {targets.Count} files (feature enabled by the user).");
+            var summary = await scanner.ScanAsync(targets, registry, options, progress, ct).ConfigureAwait(false);
+
+            // Exact duplicates share their original's content, so they share its result too.
+            var byPath = analysis.Items.ToDictionary(i => i.SourcePath, StringComparer.OrdinalIgnoreCase);
+            foreach (var dup in analysis.Items.Where(i => i.IsDuplicate && i.DuplicateOfPath != null))
+            {
+                if (byPath.TryGetValue(dup.DuplicateOfPath!, out var orig) && orig.FaceState != FaceScanState.NotScanned)
+                    CopyFaceResult(orig, dup);
+            }
+
+            RebuildPersonCopies(analysis);
+            AppLog.Info($"Face scan finished: {summary.WithPeople} with people, {summary.WithoutPeople} without, {summary.Failed} failed.");
+            return summary;
+        }
+        finally
+        {
+            if (engineOverride == null) engine.Dispose();
+        }
+    }
+
+    private static void CopyFaceResult(MediaItem from, MediaItem to)
+    {
+        to.FaceState = from.FaceState;
+        to.FaceCount = from.FaceCount;
+        to.AutoUnidentified = from.AutoUnidentified;
+        to.FaceError = from.FaceError;
+        to.AutoPeople.Clear();
+        to.AutoPeople.AddRange(from.AutoPeople);
+        to.AddedPeople.Clear();
+        foreach (var p in from.AddedPeople) to.AddedPeople.Add(p);
+        to.RemovedPeople.Clear();
+        foreach (var p in from.RemovedPeople) to.RemovedPeople.Add(p);
+        to.NotifyFaceChanged();
+    }
+
+    /// <summary>Recomputes which files belong in which person collection (after a scan or a manual correction).</summary>
+    public void RebuildPersonCopies(AnalysisResult analysis)
+    {
+        analysis.PersonCopies = analysis.Settings.CreatePersonFolders
+            ? PersonCollections.Plan(analysis.Items, analysis.Settings, analysis.PersonCopies)
+            : new List<MediaItem>();
+    }
+
+    /// <summary>
     /// Copies every file that is not yet verified. Safe to call again after Cancel, a crash or failures:
     /// files already copied and verified are recognised through the journal and never copied twice.
     /// </summary>
@@ -98,14 +165,20 @@ public sealed class OrganizerService
         var root = PathPlanner.OutputRoot(s.DestinationFolder);
         Directory.CreateDirectory(root);
 
-        CheckFreeSpace(items, s.DestinationFolder);
+        var personCopies = analysis.PersonCopies;
+        CheckFreeSpace(items.Concat(personCopies), s.DestinationFolder);
         CleanupPartFiles(root);
 
         using (var journal = new Journal(Path.Combine(s.DestinationFolder, ".media_organizer", "journal.db")))
         {
             try
             {
-                await new CopyEngine().RunAsync(items, journal, progress, pause, ct).ConfigureAwait(false);
+                var engine = new CopyEngine();
+                await engine.RunAsync(items, journal, progress, pause, ct).ConfigureAwait(false);
+
+                // Optional person-wise collections (only exists when the user used face recognition).
+                if (personCopies.Count > 0)
+                    await engine.RunAsync(personCopies, journal, progress, pause, ct).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -124,6 +197,8 @@ public sealed class OrganizerService
         result.Verified = items.Count(i => i.Status == ItemStatus.Verified);
         result.Failed = items.Count(i => i.Status == ItemStatus.Failed);
         result.Pending = items.Count(i => i.Status == ItemStatus.Pending);
+        result.PersonVerified = personCopies.Count(i => i.Status == ItemStatus.Verified);
+        result.PersonFailed = personCopies.Count(i => i.Status == ItemStatus.Failed);
 
         // Reports are always written, even for a cancelled or partly failed run.
         try
@@ -134,7 +209,7 @@ public sealed class OrganizerService
             summary.Cancelled = result.Cancelled;
 
             var folder = Path.Combine(root, "Reports", "Run_" + DateTime.Now.ToString("yyyyMMdd_HHmmss"));
-            result.ReportFiles = ReportWriter.Write(items, summary, folder, s.ExportExcel);
+            result.ReportFiles = ReportWriter.Write(items, summary, folder, s.ExportExcel, personCopies);
             result.ReportFolder = folder;
         }
         catch (Exception ex)

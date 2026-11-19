@@ -9,6 +9,8 @@ Originals are never moved, changed, compressed or deleted.
 2. Double-click `build.bat`
 3. Run `dist\MediaOrganizer\MediaOrganizer.exe`
 
+**Optional face recognition** (People tab, off by default, fully local): register people from 1-4 photos, scan the library or a folder or selected files, review and correct, and get `People\<Name>` collections. See the User Guide, section 7.
+
 Full instructions: [docs/USER_GUIDE.md](docs/USER_GUIDE.md). Design, safety model and SRS traceability: [docs/TECHNICAL.md](docs/TECHNICAL.md).
 
 ## First-run acceptance checklist (UI)

@@ -86,14 +86,39 @@ Reports contain GPS coordinates and file paths. Keep them private.
 
 Video GPS, creation date, frame rate and codec are read with **ffprobe**, which `build.bat` downloads into `tools\`. If `tools\ffprobe.exe` is missing, the app still works but videos are organized by container date or file date and **without location**; a banner tells you. To fix it, run `tools\get-tools.ps1` (right-click, *Run with PowerShell*) and copy `ffprobe.exe` into the `tools` folder next to `MediaOrganizer.exe`.
 
-## 7. Privacy and safety
+## 7. Optional: face recognition and person-wise collections (People tab)
 
-- Nothing is uploaded except optional rounded coordinates (section 4).
+Off by default. While it is off, no face model is loaded and nothing is scanned, so normal organizing is unchanged. Everything runs on your PC; nothing is uploaded.
+
+**Setup (one time):** the build downloads two small models (about 40 MB) into `models\`; run `tools\get-models.ps1` if they are missing. Videos also need `tools\ffmpeg.exe` (`tools\get-tools.ps1`). HEIC photos need Microsoft's free *HEIF Image Extensions* codec (preinstalled on most Windows 11 PCs).
+
+**Using it**
+
+1. Run **1. Analyze & Preview** as usual.
+2. Open the **People (optional)** tab and tick **Enable face recognition**.
+3. **Register a person:** type the name, choose 1 to 4 clear, front-facing photos of only that person, press *Register person*. The app reports which photos were usable. Several photos (different angle or light) match better.
+4. **Choose what to scan:** the entire analyzed library, a specific folder, or only files you select in the review list. Press **Scan for faces**. Scanning only reads your files and copies nothing. Results are cached, so scanning the same files again is instant.
+5. **Results:** every scanned file is categorized as *With people* / *Without people*, and *Recognized people* / *Unidentified people* (or both). If several registered people are in one photo or video, all of them are listed. Videos are sampled (8 frames by default) and a person counts if recognized in any frame.
+6. **Review and correct:** filter the list, select files (a preview shows on the right), pick a person, and use *Add to selected files* (the app missed them) or *Remove from selected files* (wrong name). Corrections are remembered.
+7. Press **2. Start / Resume**. As well as the normal structure, each registered person gets `People\<Name>\Photos|Videos|Screenshots\` with extra, verified copies. Optionally, media that only shows unidentified people goes to `People\_Unidentified_People`.
+
+**Good to know**
+
+- **Match strictness** (default 0.40) trades wrong names against missed matches: raise it for fewer wrong names, lower it to find more. Re-scanning with a new value is instant.
+- Copies already made in `People\` are **never deleted**, even if you later remove a person from a file.
+- Exact duplicates are not copied again: their original provides the person copy.
+- Tiny or turned-away faces, sunglasses, masks and very old photos reduce accuracy. Always review before relying on the result.
+- Face data on this PC: face *fingerprints* (numbers, not pictures) of registered people in `people.json` and of scanned files in `cache.db`, both in `%LocalAppData%\MediaOrganizer`. Use **Delete all face data from this PC** to erase them. Unticking *Enable face recognition* clears face results from the current session.
+- A *People_Report.csv* is added to the reports when the feature was used.
+
+## 8. Privacy and safety
+
+- Nothing is uploaded except optional rounded coordinates (section 4). Face recognition (section 7) never uses the network.
 - Files are read-only opened; never executed.
 - The app only accesses the two folders you choose.
 - Logs (no GPS coordinates) are in `%LocalAppData%\MediaOrganizer\logs`. Settings are in `%LocalAppData%\MediaOrganizer\settings.json`.
 
-## 8. Troubleshooting
+## 9. Troubleshooting
 
 | Problem | What to do |
 |---|---|
@@ -102,4 +127,7 @@ Video GPS, creation date, frame rate and codec are read with **ffprobe**, which 
 | Videos have no location | Install ffprobe (section 6) |
 | "Not enough free space" | Free space on the destination drive. Needs total media size plus 200 MB. |
 | A file failed | Issues tab shows why (locked, permission, path too long). Fix it and press Retry failed. |
+| "Face models were not found" | Run `tools\get-models.ps1` once, then restart the app. |
+| HEIC photos show "scan failed" | Install *HEIF Image Extensions* from the Microsoft Store. |
+| Videos are "not scannable" for faces | Put `ffmpeg.exe` in the `tools` folder (run `tools\get-tools.ps1`). |
 | HEIC/RAW photo has no date | Some rare RAW variants are not readable; the file-name or file-system date is used and marked as fallback. |

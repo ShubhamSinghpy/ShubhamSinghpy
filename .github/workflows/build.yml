@@ -15,9 +15,13 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - name: Get ffprobe
+      - name: Get ffprobe / ffmpeg
         shell: pwsh
         run: ./tools/get-tools.ps1
+
+      - name: Get face models (optional feature)
+        shell: pwsh
+        run: ./tools/get-models.ps1
 
       - name: Test
         run: dotnet test tests/MediaOrganizer.Tests/MediaOrganizer.Tests.csproj -c Release
@@ -30,6 +34,8 @@ jobs:
             -o dist/MediaOrganizer
           New-Item -ItemType Directory -Force dist/MediaOrganizer/tools | Out-Null
           Copy-Item tools/ffprobe.exe dist/MediaOrganizer/tools/ffprobe.exe
+          Copy-Item tools/ffmpeg.exe dist/MediaOrganizer/tools/ffmpeg.exe
+          Get-ChildItem dist/MediaOrganizer -File | Where-Object { $_.Extension -in '.lib', '.pdb' } | Remove-Item -Force
 
       - uses: actions/upload-artifact@v4
         with:

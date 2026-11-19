@@ -9,9 +9,9 @@ using MediaOrganizer.Core;
 
 namespace MediaOrganizer.App;
 
-public enum AppState { Idle, Analyzing, Ready, Copying, Paused, Finished }
+public enum AppState { Idle, Analyzing, Ready, Copying, Paused, Finished, ScanningFaces }
 
-public sealed class MainViewModel : ObservableObject
+public sealed partial class MainViewModel : ObservableObject
 {
     public const string All = "(All)";
 
@@ -35,6 +35,7 @@ public sealed class MainViewModel : ObservableObject
         _onlineGeocoding = _loaded.OnlineGeocoding;
         _includeNonMedia = _loaded.IncludeNonMediaFiles;
         _exportExcel = _loaded.ExportExcel;
+        InitPeople();
 
         BrowseSourceCommand = new RelayCommand(() => SourceFolder = Browse("Select the source folder (your unorganized photos and videos)") ?? SourceFolder, () => CanEdit);
         BrowseDestinationCommand = new RelayCommand(() => DestinationFolder = Browse("Select the destination folder (organized copies are created here)") ?? DestinationFolder, () => CanEdit);
@@ -92,7 +93,12 @@ public sealed class MainViewModel : ObservableObject
         OnlineGeocoding = OnlineGeocoding,
         IncludeNonMediaFiles = IncludeNonMedia,
         ExportExcel = ExportExcel,
-        Threads = _loaded.Threads
+        Threads = _loaded.Threads,
+        FaceRecognitionEnabled = FaceEnabled,
+        CreatePersonFolders = CreatePersonFolders,
+        CollectUnidentifiedPeople = CollectUnidentified,
+        FaceMatchThreshold = FaceMatchThreshold,
+        FaceVideoFrames = FaceVideoFrames
     };
 
     // ===================================================================== state
@@ -112,7 +118,7 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    public bool IsBusy => State is AppState.Analyzing or AppState.Copying or AppState.Paused;
+    public bool IsBusy => State is AppState.Analyzing or AppState.Copying or AppState.Paused or AppState.ScanningFaces;
     public bool CanEdit => !IsBusy;
     public string PauseText => State == AppState.Paused ? "Resume" : "Pause";
 
@@ -162,8 +168,10 @@ public sealed class MainViewModel : ObservableObject
     private string _filesCountText = "";
     public string FilesCountText { get => _filesCountText; private set => Set(ref _filesCountText, value); }
 
-    private int PendingCount => _analysis?.Items.Count(i => i.Status != ItemStatus.Verified) ?? 0;
-    private int FailedCount => _analysis?.Items.Count(i => i.Status == ItemStatus.Failed) ?? 0;
+    private int PendingCount => (_analysis?.Items.Count(i => i.Status != ItemStatus.Verified) ?? 0)
+                              + (_analysis?.PersonCopies.Count(i => i.Status != ItemStatus.Verified) ?? 0);
+    private int FailedCount => (_analysis?.Items.Count(i => i.Status == ItemStatus.Failed) ?? 0)
+                             + (_analysis?.PersonCopies.Count(i => i.Status == ItemStatus.Failed) ?? 0);
 
     // ---- filters
     private List<string> _years = new() { All };
@@ -207,7 +215,8 @@ public sealed class MainViewModel : ObservableObject
             !(i.FileName.Contains(q, StringComparison.OrdinalIgnoreCase) ||
               i.SourcePath.Contains(q, StringComparison.OrdinalIgnoreCase) ||
               i.Location.Contains(q, StringComparison.OrdinalIgnoreCase) ||
-              i.Device.Contains(q, StringComparison.OrdinalIgnoreCase)))
+              i.Device.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+              i.PeopleText.Contains(q, StringComparison.OrdinalIgnoreCase)))
             return false;
         return true;
     }
@@ -281,13 +290,16 @@ public sealed class MainViewModel : ObservableObject
         if (_analysis == null) return;
 
         var pending = _analysis.Items.Where(i => i.Status != ItemStatus.Verified).ToList();
-        if (pending.Count == 0) return;
+        var personPending = _analysis.PersonCopies.Where(i => i.Status != ItemStatus.Verified).ToList();
+        if (pending.Count == 0 && personPending.Count == 0) return;
 
         if (confirm)
         {
+            var extra = personPending.Count == 0 ? "" :
+                $"\n\nPlus {personPending.Count:N0} extra copies ({Fmt.Bytes(personPending.Sum(i => i.SizeBytes))}) for the person-wise collections in the People folder.";
             var answer = MessageBox.Show(
                 $"Copy {pending.Count:N0} files ({Fmt.Bytes(pending.Sum(i => i.SizeBytes))}) into:\n{PathPlanner.OutputRoot(_analysis.Settings.DestinationFolder)}\n\n" +
-                $"From:\n{_analysis.Settings.SourceFolder}\n\n" +
+                $"From:\n{_analysis.Settings.SourceFolder}{extra}\n\n" +
                 "Your original files will NOT be moved, changed or deleted. Continue?",
                 "Confirm copy", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (answer != MessageBoxResult.Yes) return;
@@ -310,9 +322,12 @@ public sealed class MainViewModel : ObservableObject
             var sb = new System.Text.StringBuilder();
             if (result.Cancelled) sb.AppendLine("The run was cancelled. Press Start / Resume to continue where it stopped.");
             else if (result.Error != null) sb.AppendLine(result.Error);
-            else if (result.Failed == 0 && result.Pending == 0) sb.AppendLine("All files were copied and verified.");
-            else sb.AppendLine($"{result.Failed:N0} file(s) failed. See the Issues tab; press Retry failed to try them again.");
+            else if (result.Failed + result.PersonFailed == 0 && result.Pending == 0) sb.AppendLine("All files were copied and verified.");
+            else sb.AppendLine($"{result.Failed + result.PersonFailed:N0} file(s) failed. See the Issues tab; press Retry failed to try them again.");
             sb.AppendLine($"Verified copies: {result.Verified:N0}   Failed: {result.Failed:N0}   Not processed: {result.Pending:N0}");
+            if (_analysis.PersonCopies.Count > 0)
+                sb.AppendLine($"Person-collection copies verified: {result.PersonVerified:N0} of {_analysis.PersonCopies.Count:N0}" +
+                              (result.PersonFailed > 0 ? $"   Failed: {result.PersonFailed:N0}" : ""));
             if (result.ReportFolder != null) sb.AppendLine("Reports saved to:\n" + result.ReportFolder);
 
             StatusText = sb.ToString().Split('\n')[0].Trim();
@@ -343,7 +358,7 @@ public sealed class MainViewModel : ObservableObject
     private async Task RetryAsync()
     {
         if (_analysis == null) return;
-        foreach (var it in _analysis.Items.Where(i => i.Status == ItemStatus.Failed))
+        foreach (var it in _analysis.Items.Concat(_analysis.PersonCopies).Where(i => i.Status == ItemStatus.Failed))
         {
             it.Status = ItemStatus.Pending;
             it.Error = null;
@@ -409,6 +424,7 @@ public sealed class MainViewModel : ObservableObject
         FilesView = null;
         FilesCountText = "";
         WarningText = "";
+        ClearPeopleResults();
     }
 
     private void ShowAnalysis(AnalysisResult a)
@@ -422,6 +438,7 @@ public sealed class MainViewModel : ObservableObject
         DeviceOptions = new[] { All }.Concat(a.Items.Select(i => i.Device).Where(d => d.Length > 0).Distinct().OrderBy(d => d, StringComparer.OrdinalIgnoreCase)).ToList();
         FormatOptions = new[] { All }.Concat(a.Items.Select(i => i.Format).Distinct().OrderBy(f => f)).ToList();
         ResetFilters();
+        AttachReview(Files);
 
         var warnings = new List<string>();
         if (a.VideoToolMissing)
@@ -456,6 +473,7 @@ public sealed class MainViewModel : ObservableObject
         Cards.Add(new StatCard("Non-media files skipped", s.NonMediaSkipped.ToString("N0")));
         Cards.Add(new StatCard("Copied & verified", $"{s.Verified:N0} / {s.TotalMediaFiles:N0}"));
         if (s.Failed > 0) Cards.Add(new StatCard("Failed", s.Failed.ToString("N0")));
+        AddFaceCards(Cards, items);
 
         YearBars.Clear();
         var years = items.GroupBy(i => i.Year).OrderBy(g => g.Key).ToList();
@@ -478,6 +496,10 @@ public sealed class MainViewModel : ObservableObject
 
         foreach (var i in _analysis.Items.Where(i => i.Status == ItemStatus.Failed).Take(3000))
             Issues.Add($"FAILED  {i.FileName}  -  {i.Error}");
+        foreach (var i in _analysis.PersonCopies.Where(i => i.Status == ItemStatus.Failed).Take(3000))
+            Issues.Add($"FAILED (person collection)  {i.FileName}  -  {i.Error}");
+        foreach (var i in _analysis.Items.Where(i => i.FaceState == FaceScanState.Failed).Take(3000))
+            Issues.Add($"FACE SCAN FAILED  {i.FileName}  -  {i.FaceError}");
         foreach (var i in _analysis.Items.Where(i => !string.IsNullOrEmpty(i.MetadataNote)).Take(3000))
             Issues.Add($"NOTE  {i.FileName}  -  {i.MetadataNote}");
         foreach (var i in _analysis.Items.Where(i => i.DateSource == DateSource.FileSystemFallback).Take(3000))

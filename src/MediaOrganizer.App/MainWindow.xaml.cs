@@ -13,6 +13,12 @@ public partial class MainWindow : Window
         DataContext = _vm;
     }
 
+    private void ReviewGrid_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        var grid = (System.Windows.Controls.DataGrid)sender;
+        _vm.SetReviewSelection(grid.SelectedItems.OfType<MediaOrganizer.Core.MediaItem>().ToList());
+    }
+
     protected override void OnClosing(CancelEventArgs e)
     {
         if (!_vm.ConfirmClose()) e.Cancel = true;

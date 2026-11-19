@@ -31,6 +31,15 @@ public sealed class OrganizerSettings
 
     public bool ExportExcel { get; set; } = true;
 
+    // ---- optional face recognition. OFF by default: nothing is loaded or scanned unless the user turns it on. ----
+    public bool FaceRecognitionEnabled { get; set; } = false;
+    /// <summary>Create People\&lt;Name&gt; collections of verified copies for every registered person.</summary>
+    public bool CreatePersonFolders { get; set; } = true;
+    /// <summary>Also collect media that only shows unidentified people in People\_Unidentified_People.</summary>
+    public bool CollectUnidentifiedPeople { get; set; } = false;
+    public double FaceMatchThreshold { get; set; } = 0.40;
+    public int FaceVideoFrames { get; set; } = 8;
+
     /// <summary>0 = automatic.</summary>
     public int Threads { get; set; } = 0;
 

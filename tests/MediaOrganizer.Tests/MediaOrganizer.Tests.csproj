@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <None Update="TestData\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\models\*.onnx" Link="models\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

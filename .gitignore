@@ -2,5 +2,7 @@ bin/
 obj/
 dist/
 tools/ffprobe.exe
+tools/ffmpeg.exe
+models/*.onnx
 .vs/
 *.user

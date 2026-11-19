@@ -116,7 +116,7 @@ public sealed class CopyEngine
         long mtime = srcInfo.LastWriteTimeUtc.Ticks;
 
         // ---- resume: already copied and verified in an earlier (interrupted) run? -------------
-        var rec = journal.Find(it.SourcePath, length, mtime);
+        var rec = journal.Find(it.JournalKey, length, mtime);
         if (rec != null && File.Exists(rec.DestPath) && new FileInfo(rec.DestPath).Length == length)
         {
             MarkVerified(it, rec.DestPath, rec.Sha256, rec.Sha256);
@@ -137,7 +137,7 @@ public sealed class CopyEngine
                 {
                     // Identical content is already there (e.g. app was closed right after the final rename).
                     MarkVerified(it, target, srcHash, existingHash);
-                    journal.Record(new CopyRecord(it.SourcePath, length, mtime, target, existingHash));
+                    journal.Record(new CopyRecord(it.JournalKey, length, mtime, target, existingHash));
                     return;
                 }
             }
@@ -193,7 +193,7 @@ public sealed class CopyEngine
 
             it.Sha256 = sourceHash;
             MarkVerified(it, target, sourceHash, destHash);
-            journal.Record(new CopyRecord(it.SourcePath, length, mtime, target, sourceHash));
+            journal.Record(new CopyRecord(it.JournalKey, length, mtime, target, sourceHash));
         }
         catch (IOException ex) when (IsDiskFull(ex))
         {

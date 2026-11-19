@@ -14,6 +14,11 @@
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
 
+  <!-- Optional face recognition models (tools\get-models.ps1). Copied next to the exe; only read when the feature is enabled. -->
+  <ItemGroup>
+    <None Include="..\..\models\*.onnx" Link="models\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\MediaOrganizer.Core\MediaOrganizer.Core.csproj" />
   </ItemGroup>

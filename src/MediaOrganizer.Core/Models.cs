@@ -20,6 +20,8 @@ public enum DateSource
 
 public enum ItemStatus { Pending, Verified, Failed }
 
+public enum FaceScanState { NotScanned, Scanned, Failed, Unsupported }
+
 /// <summary>One media file found in the source folder plus everything we learned about it.</summary>
 public sealed class MediaItem : INotifyPropertyChanged
 {
@@ -78,6 +80,88 @@ public sealed class MediaItem : INotifyPropertyChanged
     public int DuplicateGroup { get; set; }
     public string? DuplicateOfPath { get; set; }
     public string? EventName { get; set; }
+
+    // ---- optional face recognition (all defaults mean "not scanned") ------
+    public FaceScanState FaceState { get; set; } = FaceScanState.NotScanned;
+    /// <summary>Most faces seen in one image / one sampled video frame.</summary>
+    public int FaceCount { get; set; }
+    /// <summary>Faces that matched no registered person (before manual corrections).</summary>
+    public int AutoUnidentified { get; set; }
+    public string? FaceError { get; set; }
+    /// <summary>People recognised automatically.</summary>
+    public List<string> AutoPeople { get; } = new();
+    /// <summary>People the user added by hand.</summary>
+    public HashSet<string> AddedPeople { get; } = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Automatic matches the user rejected.</summary>
+    public HashSet<string> RemovedPeople { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Final list of people for this file: automatic matches minus rejected plus manual additions.</summary>
+    public IReadOnlyList<string> People
+    {
+        get
+        {
+            var list = AutoPeople.Where(p => !RemovedPeople.Contains(p)).ToList();
+            foreach (var a in AddedPeople)
+                if (!list.Contains(a, StringComparer.OrdinalIgnoreCase)) list.Add(a);
+            list.Sort(StringComparer.OrdinalIgnoreCase);
+            return list;
+        }
+    }
+
+    public int UnidentifiedFaces
+    {
+        get
+        {
+            int removedAuto = AutoPeople.Count(p => RemovedPeople.Contains(p));
+            int addedManual = AddedPeople.Count(p => !AutoPeople.Contains(p, StringComparer.OrdinalIgnoreCase));
+            return Math.Max(0, AutoUnidentified + removedAuto - addedManual);
+        }
+    }
+
+    public bool HasRecognizedPeople => People.Count > 0;
+    public bool HasUnidentifiedPeople => FaceState == FaceScanState.Scanned && UnidentifiedFaces > 0;
+    public bool HasPeople => HasRecognizedPeople || (FaceState == FaceScanState.Scanned && FaceCount > 0);
+    public bool FaceScanned => FaceState == FaceScanState.Scanned || People.Count > 0;
+
+    public string PeopleText => string.Join(", ", People);
+
+    public string FaceCategoryText
+    {
+        get
+        {
+            if (FaceState == FaceScanState.Failed && People.Count == 0) return "Scan failed";
+            if (FaceState == FaceScanState.Unsupported && People.Count == 0) return "Not scannable";
+            if (!FaceScanned) return "Not scanned";
+            if (!HasPeople) return "No people";
+            if (HasRecognizedPeople && HasUnidentifiedPeople) return "Recognized + unidentified";
+            return HasRecognizedPeople ? "Recognized people" : "Unidentified people";
+        }
+    }
+
+    /// <summary>Tells the UI that any face-related value changed.</summary>
+    public void NotifyFaceChanged()
+    {
+        foreach (var n in new[] { nameof(FaceState), nameof(FaceCount), nameof(People), nameof(PeopleText),
+                                  nameof(UnidentifiedFaces), nameof(FaceCategoryText), nameof(HasPeople) })
+            Raise(n);
+    }
+
+    /// <summary>Clears every face result for this file (used when the user deletes all face data).</summary>
+    public void ResetFaces()
+    {
+        FaceState = FaceScanState.NotScanned;
+        FaceCount = 0;
+        AutoUnidentified = 0;
+        FaceError = null;
+        AutoPeople.Clear();
+        AddedPeople.Clear();
+        RemovedPeople.Clear();
+        NotifyFaceChanged();
+    }
+
+    /// <summary>Key used by the copy journal. Person-collection copies use their own key so they never clash with the main copy.</summary>
+    public string? JournalKeyOverride { get; init; }
+    public string JournalKey => JournalKeyOverride ?? SourcePath;
 
     // ---- notes ----------------------------------------------------------
     public string? MetadataNote { get; private set; }
